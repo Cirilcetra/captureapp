@@ -1,6 +1,10 @@
+"use client";
+
 // Initialize Firebase for the application
 import { initializeApp } from "firebase/app";
 import { getStorage, ref, uploadBytes, uploadString, getDownloadURL, deleteObject } from "firebase/storage";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, User } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
 // Firebase configuration from environment variables
 const firebaseConfig = {
@@ -16,6 +20,8 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const storage = getStorage(app);
+const auth = getAuth(app);
+const db = getFirestore(app);
 
 /**
  * Upload a video blob to Firebase Storage
@@ -83,4 +89,32 @@ export const deleteVideo = async (id: string): Promise<void> => {
   }
 };
 
-export { storage }; 
+// Firebase Auth Functions
+/**
+ * Sign up a new user with email and password
+ * @param email User's email
+ * @param password User's password
+ * @returns User credentials
+ */
+export const signUp = async (email: string, password: string) => {
+  return createUserWithEmailAndPassword(auth, email, password);
+};
+
+/**
+ * Sign in an existing user with email and password
+ * @param email User's email
+ * @param password User's password
+ * @returns User credentials
+ */
+export const signIn = async (email: string, password: string) => {
+  return signInWithEmailAndPassword(auth, email, password);
+};
+
+/**
+ * Sign out the current user
+ */
+export const logOut = async () => {
+  return signOut(auth);
+};
+
+export { storage, auth, db }; 

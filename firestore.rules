@@ -1,0 +1,19 @@
+// Firestore Security Rules for Car Capture App
+// Copy these rules to your Firebase Console: https://console.firebase.google.com/
+// Navigate to Firestore Database > Rules and paste these rules
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow users to read and write only their own projects
+    match /projects/{projectId} {
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow read, update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+    
+    // Default deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

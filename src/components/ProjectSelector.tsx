@@ -45,12 +45,22 @@ export default function ProjectSelector({ projects, onSelectProject }: ProjectSe
     },
   });
   
+  const [isCreating, setIsCreating] = useState(false);
+  
   // Form submission handler
-  const onSubmit = (values: FormValues) => {
-    createProject(values.carId);
-    setOpen(false);
-    toast.success(`Project for "${values.carId}" created!`);
-    form.reset();
+  const onSubmit = async (values: FormValues) => {
+    setIsCreating(true);
+    try {
+      await createProject(values.carId);
+      setOpen(false);
+      toast.success(`Project for "${values.carId}" created!`);
+      form.reset();
+    } catch (error) {
+      console.error("Error creating project:", error);
+      toast.error("Failed to create project. Please try again.");
+    } finally {
+      setIsCreating(false);
+    }
   };
   
   // Helper to format dates
@@ -99,7 +109,9 @@ export default function ProjectSelector({ projects, onSelectProject }: ProjectSe
                 />
                 
                 <DialogFooter>
-                  <Button type="submit">Create Project</Button>
+                  <Button type="submit" disabled={isCreating}>
+                    {isCreating ? "Creating..." : "Create Project"}
+                  </Button>
                 </DialogFooter>
               </form>
             </Form>
