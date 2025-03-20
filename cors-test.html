@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Firebase CORS Test</title>
+</head>
+<body>
+  <h1>Firebase CORS Test</h1>
+  <button id="testButton">Test CORS</button>
+  <pre id="result"></pre>
+
+  <script>
+    document.getElementById('testButton').addEventListener('click', async () => {
+      const resultEl = document.getElementById('result');
+      resultEl.textContent = 'Testing CORS...';
+      
+      try {
+        // Test URL (replace with your actual Firebase Storage URL)
+        const testUrl = 'https://firebasestorage.googleapis.com/v0/b/recipevault-79a1b.appspot.com/o?name=test';
+        
+        // Make a preflight OPTIONS request
+        const response = await fetch(testUrl, {
+          method: 'OPTIONS',
+          headers: {
+            'Origin': window.location.origin,
+            'Access-Control-Request-Method': 'POST',
+            'Access-Control-Request-Headers': 'Content-Type',
+          }
+        });
+        
+        resultEl.textContent = `
+Status: ${response.status}
+OK: ${response.ok}
+Headers: ${JSON.stringify(Object.fromEntries([...response.headers]), null, 2)}
+        `;
+      } catch (error) {
+        resultEl.textContent = `Error: ${error.message}`;
+      }
+    });
+  </script>
+</body>
+</html> 

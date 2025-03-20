@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Car Video Cataloger
+
+A Next.js Progressive Web App (PWA) for creating professional car promotional videos. Capture multiple shots of a car from different angles, generate AI-powered scripts, add professional narration, and combine them into a 1-minute promotional video.
+
+## Features
+
+- **Video Capture**: Record 10 six-second videos from different car angles
+- **AI Script Generation**: Generate a contextual script using OpenAI that aligns with the video sequence
+- **Text-to-Speech**: Create professional narration using ElevenLabs API
+- **Video Processing**: Stitch videos together with synchronized AI-generated audio
+- **Offline Capabilities**: Works as a PWA with offline functionality
+- **Responsive Design**: Works on both desktop and mobile devices
+
+## Technical Stack
+
+- **Framework**: Next.js (App Router)
+- **UI Components**: shadcn/ui
+- **Styling**: Tailwind CSS
+- **State Management**: Zustand with persist middleware
+- **Form Validation**: React Hook Form with Zod
+- **Video Processing**: FFMPEG WASM
+- **AI Integration**: OpenAI for script generation, ElevenLabs for text-to-speech
 
 ## Getting Started
 
-First, run the development server:
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Add your API keys:
+   - Update the OpenAI API key in `src/lib/openai.tsx`
+   - Update the ElevenLabs API key in `src/lib/elevenlabs.tsx`
+
+4. Run the development server:
+   ```bash
+   npm run dev
+   ```
+
+5. Open [http://localhost:3000](http://localhost:3000) in your browser
+
+## User Flow
+
+1. **Create a New Project**: Enter a unique car ID
+2. **Capture Videos**: Record 10 different 6-second shots with ability to reshoot
+3. **Generate Script**: Enter car details and generate a synchronized script
+4. **Create Narration**: Select a voice and generate audio narration
+5. **Preview and Export**: Combine videos with narration and download the final result
+
+## Portrait Mode Optimization
+
+The application is specially designed for portrait video capture (9:16 aspect ratio), making it perfect for social media content and mobile viewing. The video processing pipeline automatically optimizes videos for this format.
+
+## Production Build
+
+To create a production build:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run build
+npm start
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## License
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT
