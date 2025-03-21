@@ -5,9 +5,10 @@ import { useAppStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { combineVideos, addAudioToVideo } from "@/lib/video-processor";
-import { generateNarration, getAvailableVoices, Voice } from "@/lib/elevenlabs";
+import { getAvailableVoices, generateNarration, Voice } from "@/lib/api-client";
 import { uploadVideo } from "@/lib/firebase";
+import { combineVideosServer, addAudioToVideoServer } from "@/lib/api-client";
+import { Loader2, RefreshCw, Play, Pause } from "lucide-react";
 
 export default function FinalPreview() {
   const { currentProject, setFinalVideo, completeProject, setNarrationUrl } = useAppStore();
@@ -21,198 +22,97 @@ export default function FinalPreview() {
   const [availableVoices, setAvailableVoices] = useState<Voice[]>([]);
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>("");
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
-  const [combinedVideoBlob, setCombinedVideoBlob] = useState<Blob | null>(null);
   const [combinedVideoUrl, setCombinedVideoUrl] = useState<string | null>(null);
-  const [debugInfo, setDebugInfo] = useState<string>("");
+  const [isPlaying, setIsPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   
-  // Load available voices from ElevenLabs
+  // Load available voices and set initial state
   useEffect(() => {
-    const loadVoices = async () => {
-      try {
-        console.log("Loading voices from ElevenLabs...");
-        const voices = await getAvailableVoices();
-        console.log("Voices loaded:", voices);
-        setAvailableVoices(voices);
-        if (voices.length > 0) {
-          setSelectedVoiceId(voices[0].voice_id);
-        }
-      } catch (error) {
-        console.error("Error loading voices:", error);
-        toast.error("Failed to load available voices. Please try again.");
-      }
-    };
-    
     loadVoices();
-  }, []);
+    // Set combined video URL if it exists in the project
+    if (currentProject?.finalVideoUrl) {
+      setCombinedVideoUrl(currentProject.finalVideoUrl);
+    }
+  }, [currentProject]);
   
-  // Show audio player if narration exists
-  const renderAudioSection = () => {
-    if (!currentProject) return null;
-
-    if (currentProject.narrationUrl) {
-      return (
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Generated Narration</label>
-          <audio 
-            ref={audioRef}
-            src={currentProject.narrationUrl} 
-            controls 
-            className="w-full"
-            onError={() => {
-              toast.error("Failed to load audio narration");
-            }}
-          />
-        </div>
-      );
-    }
-
-    return (
-      <>
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Select Voice</label>
-          <select
-            value={selectedVoiceId}
-            onChange={(e) => setSelectedVoiceId(e.target.value)}
-            className="w-full p-2 rounded-md border"
-            disabled={generatingAudio}
-          >
-            {availableVoices.map((voice) => (
-              <option key={voice.voice_id} value={voice.voice_id}>
-                {voice.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        
-        <Button
-          onClick={handleGenerateAudio}
-          disabled={!currentProject.generatedScript || generatingAudio}
-          className="w-full"
-        >
-          {generatingAudio ? "Generating Audio..." : "Generate Audio"}
-        </Button>
-      </>
-    );
-  };
-  
-  // Generate audio narration from script
-  const handleGenerateAudio = async () => {
-    if (!currentProject || !currentProject.generatedScript) {
-      toast.error("No script available for audio generation");
-      return;
-    }
-
-    // If narration already exists, don't generate again
-    if (currentProject.narrationUrl) {
-      toast.info("Narration already exists");
-      return;
-    }
-    
-    setGeneratingAudio(true);
-    setDebugInfo(prev => prev + "\nStarting audio generation");
-    
+  const loadVoices = async () => {
     try {
-      console.log("Generating narration with voice ID:", selectedVoiceId);
-      const narrationBlob = await generateNarration(
-        currentProject.generatedScript,
-        { voiceId: selectedVoiceId }
-      );
-      
-      console.log("Narration generated, blob size:", narrationBlob.size);
-      setDebugInfo(prev => prev + `\nAudio narration generated: ${narrationBlob.size} bytes`);
-      
-      // Upload the narration to Firebase
-      const narrationId = `${currentProject.id}-narration-${Date.now()}`;
-      const narrationUrl = await uploadVideo(narrationId, narrationBlob, 'narration');
-      
-      // Save the narration URL to the project
-      await setNarrationUrl(currentProject.id, narrationUrl);
-      
-      setAudioBlob(narrationBlob);
-      toast.success("Audio narration generated and saved!");
-    } catch (error) {
-      console.error("Error generating narration:", error);
-      setDebugInfo(prev => prev + `\nError generating narration: ${error}`);
-      
-      // Show a more helpful error message
-      if (error instanceof Error) {
-        if (error.message.includes('401')) {
-          toast.error("Failed to generate audio: Invalid API key. Please check your ElevenLabs API key in .env.local");
-        } else {
-          toast.error(`Failed to generate audio: ${error.message}`);
-        }
-      } else {
-        toast.error("Failed to generate audio narration. Please try again.");
+      const voices = await getAvailableVoices();
+      setAvailableVoices(voices);
+      if (voices.length > 0) {
+        setSelectedVoiceId(voices[0].voice_id);
       }
-    } finally {
-      setGeneratingAudio(false);
+    } catch (error) {
+      console.error("Error loading voices:", error);
+      toast.error("Failed to load available voices");
     }
   };
-  
-  // Combine all videos into one
+
   const handleCombineVideos = async () => {
-    if (!currentProject) {
-      toast.error("Project not available");
+    if (!currentProject?.shots || currentProject.shots.length === 0) {
+      toast.error("No videos to combine");
       return;
     }
-    
-    const shotsWithVideos = currentProject.shots.filter(shot => shot.videoUrl);
-    
-    if (shotsWithVideos.length !== currentProject.shots.length) {
-      toast.error("Not all videos have been captured");
-      setDebugInfo(prev => prev + "\nCannot combine videos: not all shots have been captured");
+
+    // Filter out shots without videoUrl
+    const validShots = currentProject.shots.filter(shot => shot.videoUrl);
+    if (validShots.length === 0) {
+      toast.error("No valid videos found to combine");
       return;
     }
-    
-    setCombiningVideos(true);
-    setCombineProgress(0);
-    setCombineStage('Starting...');
-    setDebugInfo(prev => prev + "\nStarting video combination process");
-    
+
     try {
-      console.log("Starting to fetch video blobs");
+      setCombiningVideos(true);
+      setCombineProgress(0);
+      setCombineStage('Starting video combination...');
+
+      const videoUrls = validShots.map(shot => shot.videoUrl!);
       
-      // Fetch all video blobs from Firebase URLs with proper credentials
-      const videoUrls = shotsWithVideos.map(shot => {
-        if (!shot.videoUrl) throw new Error("Missing video URL");
-        return shot.videoUrl;
-      });
-      
-      // Combine the videos with progress tracking
-      toast.info("Combining videos... This may take a moment.");
-      const combinedBlob = await combineVideos(
+      // Step 1: Combine videos with muted audio
+      const combinedUrl = await combineVideosServer(
+        currentProject.id,
         videoUrls,
         (progress, stage) => {
           setCombineProgress(progress);
-          setCombineStage(stage);
-        }
+          setCombineStage(`Combining videos: ${stage}`);
+        },
+        true  // mute original audio
       );
-      
-      console.log("Videos combined successfully, combined size:", combinedBlob.size);
-      setDebugInfo(prev => prev + `\nVideos combined: ${combinedBlob.size} bytes`);
-      
-      setCombinedVideoBlob(combinedBlob);
-      
-      // Create URL for video preview
-      const url = URL.createObjectURL(combinedBlob);
-      setCombinedVideoUrl(url);
-      
-      toast.success("Videos combined successfully!");
-      
-      // Set the video source
-      if (videoRef.current) {
-        const videoSrc = currentProject.finalVideoUrl || url;
-        if (videoSrc) {
-          videoRef.current.src = videoSrc;
-          videoRef.current.load();
-        }
+
+      // Step 2: If narration exists, add it to the combined video immediately
+      if (currentProject.narrationUrl) {
+        setCombineStage('Adding narration to video...');
+        setCombineProgress(0);
+
+        const finalVideoUrl = await addAudioToVideoServer(
+          currentProject.id,
+          combinedUrl,
+          currentProject.narrationUrl,
+          (progress, stage) => {
+            setCombineProgress(progress);
+            setCombineStage(`Adding narration: ${stage}`);
+          }
+        );
+
+        // Save the final video URL and update preview
+        const finalVideoId = `${currentProject.id}-final`;
+        await setFinalVideo(currentProject.id, finalVideoUrl, finalVideoId);
+        await completeProject(currentProject.id);
+        setCombinedVideoUrl(finalVideoUrl);
+        
+        toast.success("Videos combined with narration successfully!");
+      } else {
+        // If no narration, save and show the muted combined video
+        const finalVideoId = `${currentProject.id}-final`;
+        await setFinalVideo(currentProject.id, combinedUrl, finalVideoId);
+        await completeProject(currentProject.id);
+        setCombinedVideoUrl(combinedUrl);
+        toast.success("Videos combined successfully!");
       }
     } catch (error) {
-      console.error("Error combining videos:", error);
-      setDebugInfo(prev => prev + `\nError combining videos: ${error}`);
-      toast.error(`Failed to combine videos: ${error instanceof Error ? error.message : "Unknown error"}`);
+      console.error("Error in video processing:", error);
+      toast.error("Failed to process videos: " + (error instanceof Error ? error.message : "Unknown error"));
     } finally {
       setCombiningVideos(false);
       setCombineProgress(0);
@@ -220,226 +120,238 @@ export default function FinalPreview() {
     }
   };
   
-  // Add audio narration to the combined video
-  const handleAddAudioToVideo = async () => {
-    if (!currentProject) {
-      toast.error("No project available");
+  const handleGenerateNarration = async () => {
+    if (!currentProject?.generatedScript || !selectedVoiceId) {
+      toast.error("Please generate a script first and select a voice");
       return;
     }
 
-    if ((!combinedVideoBlob && !currentProject.finalVideoUrl) || 
-        (!audioBlob && !currentProject.narrationUrl)) {
-      toast.error("Missing video or audio for final production");
+    setGeneratingAudio(true);
+    setAudioProgress(0);
+    setAudioStage('Generating narration...');
+
+    try {
+      // Generate narration using backend API
+      const audioBlob = await generateNarration({
+        script: currentProject.generatedScript,
+        voice_id: selectedVoiceId
+      });
+
+      // Upload audio to Firebase
+      const audioId = `${currentProject.id}-narration`;
+      const audioUrl = await uploadVideo(audioId, audioBlob, 'narration');
+      
+      // Save narration URL
+      await setNarrationUrl(currentProject.id, audioUrl);
+      setAudioBlob(audioBlob);
+      
+      toast.success("Narration generated successfully!");
+    } catch (error) {
+      console.error("Error generating narration:", error);
+      toast.error("Failed to generate narration");
+    } finally {
+      setGeneratingAudio(false);
+    }
+  };
+  
+  const handleAddAudioToVideo = async () => {
+    if (!currentProject || !combinedVideoUrl || !currentProject.narrationUrl) {
+      toast.error("Please combine videos and generate narration first");
       return;
     }
-    
+
     setProcessing(true);
     setAudioProgress(0);
     setAudioStage('Starting...');
-    setDebugInfo(prev => prev + "\nStarting to add audio to video");
-    
+
     try {
-      console.log("Adding audio to video");
-      toast.info("Creating final video... This may take a minute.");
-
-      // Get video blob - either use local blob or download from Firebase
-      let videoToUse = combinedVideoBlob;
-      if (!videoToUse && currentProject.finalVideoUrl) {
-        console.log("Downloading video from Firebase...");
-        setAudioStage('Downloading video from Firebase...');
-        setAudioProgress(10);
-        const response = await fetch(currentProject.finalVideoUrl);
-        videoToUse = await response.blob();
-      }
-
-      // Get audio blob - either use local blob or download from Firebase
-      let audioToUse = audioBlob;
-      if (!audioToUse && currentProject.narrationUrl) {
-        console.log("Downloading audio from Firebase...");
-        setAudioStage('Downloading audio from Firebase...');
-        setAudioProgress(20);
-        const response = await fetch(currentProject.narrationUrl);
-        audioToUse = await response.blob();
-      }
-
-      if (!videoToUse || !audioToUse) {
-        throw new Error("Failed to get video or audio content");
-      }
-      
-      const finalVideoBlob = await addAudioToVideo(
-        videoToUse, 
-        audioToUse,
+      // Add narration to muted video
+      const finalVideoUrl = await addAudioToVideoServer(
+        currentProject.id,
+        combinedVideoUrl,
+        currentProject.narrationUrl,
         (progress, stage) => {
-          setAudioProgress(30 + (progress * 0.5)); // Scale progress to 30-80%
+          setAudioProgress(progress);
           setAudioStage(stage);
         }
       );
+
+      // Save and update preview with the final video
+      const finalVideoId = `${currentProject.id}-final`;
+      await setFinalVideo(currentProject.id, finalVideoUrl, finalVideoId);
+      await completeProject(currentProject.id);
+      setCombinedVideoUrl(finalVideoUrl);
       
-      console.log("Audio added to video, final size:", finalVideoBlob.size);
-      setDebugInfo(prev => prev + `\nFinal video created: ${finalVideoBlob.size} bytes`);
-      
-      // Upload final video to Firebase Storage
-      setAudioStage('Uploading final video...');
-      setAudioProgress(90);
-      const finalVideoId = `${currentProject.id}-final-${Date.now()}`;
-      toast.info("Uploading final video...");
-      const downloadURL = await uploadVideo(finalVideoId, finalVideoBlob, 'video');
-      
-      // Update the store with the Firebase download URL and ID
-      setAudioProgress(95);
-      setFinalVideo(currentProject.id, downloadURL, finalVideoId);
-      completeProject(currentProject.id);
-      
-      setAudioProgress(100);
-      setAudioStage('Complete!');
-      toast.success("Final video created and stored successfully!");
-      
-      // Set the video source to the Firebase URL
-      if (videoRef.current) {
-        videoRef.current.src = downloadURL;
-        videoRef.current.load();
-      }
-      
-      // Also keep a local reference for immediate playback
-      setCombinedVideoUrl(downloadURL);
+      toast.success("Narration added successfully!");
     } catch (error) {
-      console.error("Error adding audio to video:", error);
-      setDebugInfo(prev => prev + `\nError adding audio to video: ${error}`);
-      toast.error(`Failed to create final video: ${error instanceof Error ? error.message : "Unknown error"}`);
+      console.error("Error adding audio:", error);
+      toast.error("Failed to add narration to video");
     } finally {
       setProcessing(false);
-      setAudioProgress(0);
-      setAudioStage('');
     }
   };
-  
-  // Download the final video
-  const handleDownload = () => {
-    if (!currentProject?.finalVideoUrl) {
-      toast.error("No final video available for download");
-      return;
-    }
+
+  const toggleAudioPlayback = () => {
+    if (!audioRef.current) return;
     
-    const a = document.createElement("a");
-    a.href = currentProject.finalVideoUrl;
-    a.download = `${currentProject.carId.replace(/\s+/g, "-")}-promo.mp4`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    if (isPlaying) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play();
+    }
+    setIsPlaying(!isPlaying);
   };
   
-  // Return null if no project
   if (!currentProject) return null;
   
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Final Preview</h2>
-        <div className="flex items-center gap-2">
-          {currentProject.finalVideoUrl && (
-            <Button onClick={handleDownload} variant="outline">
-              Download
-            </Button>
-          )}
-        </div>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Video Preview */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Video Preview</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="aspect-[9/16] overflow-hidden rounded-md bg-muted">
-              {combinedVideoUrl || currentProject.finalVideoUrl ? (
-                <video
-                  ref={videoRef}
-                  src={combinedVideoUrl || currentProject.finalVideoUrl || undefined}
-                  className="w-full h-full object-cover"
-                  controls
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                  No video preview available
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-        
-        {/* Controls */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Production Controls</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {renderAudioSection()}
-            
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Final Video Preview</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Video preview */}
+          {combinedVideoUrl && (
             <div className="space-y-2">
+              <video
+                ref={videoRef}
+                src={combinedVideoUrl}
+                controls
+                className="w-full rounded-lg"
+                muted={!!currentProject?.narrationUrl} // Mute if narration exists
+              />
               <Button
                 onClick={handleCombineVideos}
-                disabled={combiningVideos || !currentProject?.shots.every(shot => shot.completed)}
+                variant="outline"
                 className="w-full"
+                disabled={combiningVideos}
               >
-                {combiningVideos ? "Combining Videos..." : "Combine Videos"}
+                {combiningVideos ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    {combineStage} ({combineProgress}%)
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Recombine {currentProject.narrationUrl ? 'Video with Narration' : 'Videos'}
+                  </>
+                )}
               </Button>
-              
-              {combiningVideos && (
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>{combineStage}</span>
-                    <span>{Math.round(combineProgress)}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
-                    <div 
-                      className="bg-primary h-2 rounded-full transition-all duration-300" 
-                      style={{ width: `${combineProgress}%` }}
-                    ></div>
-                  </div>
-                </div>
-              )}
             </div>
-            
-            <div className="space-y-2">
-              <Button
-                onClick={handleAddAudioToVideo}
-                disabled={processing || !combinedVideoBlob || (!audioBlob && !currentProject?.narrationUrl)}
-                className="w-full"
-              >
-                {processing ? "Creating Final Video..." : "Add Audio to Video"}
-              </Button>
+          )}
 
-              {processing && (
+          {/* Initial combine button if no combined video exists */}
+          {!combinedVideoUrl && (
+            <Button
+              onClick={handleCombineVideos}
+              disabled={combiningVideos}
+              className="w-full"
+            >
+              {combiningVideos ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  {combineStage} ({combineProgress}%)
+                </>
+              ) : (
+                "Combine Videos"
+              )}
+            </Button>
+          )}
+
+          {/* Narration section */}
+          {combinedVideoUrl && (
+            <div className="space-y-4">
+              {currentProject.narrationUrl ? (
+                // Audio player for existing narration
                 <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>{audioStage}</span>
-                    <span>{Math.round(audioProgress)}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
-                    <div 
-                      className="bg-primary h-2 rounded-full transition-all duration-300" 
-                      style={{ width: `${audioProgress}%` }}
-                    ></div>
-                  </div>
+                  <audio
+                    ref={audioRef}
+                    src={currentProject.narrationUrl}
+                    onEnded={() => setIsPlaying(false)}
+                    className="hidden"
+                  />
+                  <Button
+                    onClick={toggleAudioPlayback}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    {isPlaying ? (
+                      <>
+                        <Pause className="w-4 h-4 mr-2" />
+                        Pause Narration
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-4 h-4 mr-2" />
+                        Play Narration
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    onClick={handleGenerateNarration}
+                    variant="outline"
+                    disabled={generatingAudio}
+                    className="w-full"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Regenerate Narration
+                  </Button>
+                </div>
+              ) : (
+                // Narration generation controls
+                <div className="space-y-2">
+                  <select
+                    value={selectedVoiceId}
+                    onChange={(e) => setSelectedVoiceId(e.target.value)}
+                    className="w-full p-2 rounded border"
+                  >
+                    {availableVoices.map((voice) => (
+                      <option key={voice.voice_id} value={voice.voice_id}>
+                        {voice.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <Button
+                    onClick={handleGenerateNarration}
+                    disabled={generatingAudio || !currentProject.generatedScript}
+                    className="w-full"
+                  >
+                    {generatingAudio ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        {audioStage} ({audioProgress}%)
+                      </>
+                    ) : (
+                      "Generate Narration"
+                    )}
+                  </Button>
                 </div>
               )}
+
+              {/* Add audio button - only show if we have both video and narration but no final video */}
+              {combinedVideoUrl && currentProject.narrationUrl && !currentProject.finalVideoUrl && (
+                <Button
+                  onClick={handleAddAudioToVideo}
+                  disabled={processing}
+                  className="w-full"
+                >
+                  {processing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      {audioStage} ({audioProgress}%)
+                    </>
+                  ) : (
+                    "Add Narration to Video"
+                  )}
+                </Button>
+              )}
             </div>
-            
-            {/* Debug Info */}
-            {process.env.NODE_ENV === 'development' && debugInfo && (
-              <div className="mt-4">
-                <details className="text-xs">
-                  <summary className="cursor-pointer font-medium">Debug Info</summary>
-                  <pre className="mt-2 p-2 bg-muted rounded whitespace-pre-wrap">
-                    {debugInfo}
-                  </pre>
-                </details>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 } 

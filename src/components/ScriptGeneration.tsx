@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useAppStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { generateScript } from "@/lib/openai";
+import { generateScript } from "@/lib/api-client";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -48,8 +48,11 @@ export default function ScriptGeneration({ onScriptGenerated }: ScriptGeneration
         `${shot.angle}: ${shot.description}`
       );
       
-      // Generate script using OpenAI
-      const script = await generateScript(values.carDetails, shotDescriptions);
+      // Generate script using backend API
+      const script = await generateScript({
+        car_details: values.carDetails,
+        angle_descriptions: shotDescriptions
+      });
       
       // Save the generated script
       await setGeneratedScript(currentProject.id, script);
