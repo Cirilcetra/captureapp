@@ -74,21 +74,29 @@ export async function POST(request: NextRequest) {
       ${angleDescriptions.map((desc, i) => `${i + 1}. ${desc}`).join('\n')}
       
       Instructions:
-      - Script should be around 150-200 words
-      - Use professional, engaging language
-      - Highlight key features
-      - Script should follow the sequence of video angles
-      - Each angle gets approximately 6 seconds of narration
-      - Keep the narration tight, concise, and impactful
+      Write a plane script without shot, angle, narrator etc.
+      Word Limit: Around 100 words
+      Tone: Professional, engaging, and impactful
+      Structure: Follow the sequence of video angles (Front, Side, Rear, Interior)
+      Timing: Each section should fit within approximately 10 seconds of narration
+      Content: Highlight key features concisely, making them sound compelling
+      Restrictions:
+      - No scene directions (e.g., “Fade in,” “Shot 1”)
+      - No speaker labels (e.g., “Narrator:”)
+      - No additional explanations, only the script itself
+
     `;
 
     try {
       const completion = await openai.chat.completions.create({
         messages: [
-          { role: "system", content: "You are a professional automotive copywriter who creates concise, engaging scripts for car promotion videos." },
+          { 
+            role: "system", 
+            content: "You are a professional automotive copywriter who creates concise, engaging scripts for car promotion videos. Your scripts are known for their powerful, emotional language that connects with viewers while maintaining technical accuracy." 
+          },
           { role: "user", content: prompt }
         ],
-        model: "gpt-4o-mini",
+        model: "gpt-4",
         temperature: 0.7,
         max_tokens: 500
       });

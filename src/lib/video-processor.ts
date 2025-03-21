@@ -74,7 +74,10 @@ async function downloadVideo(url: string): Promise<Blob> {
   }
 }
 
-export async function combineVideos(videoUrls: string[]): Promise<Blob> {
+export async function combineVideos(
+  videoUrls: string[],
+  onProgress?: (progress: number, stage: string) => void
+): Promise<Blob> {
   try {
     console.log(`🎬 Starting to combine ${videoUrls.length} videos...`);
     
@@ -84,6 +87,7 @@ export async function combineVideos(videoUrls: string[]): Promise<Blob> {
 
     // Load FFmpeg if not already loaded
     if (!ffmpeg.loaded) {
+      onProgress?.(0, 'Loading FFmpeg...');
       console.log('⚙️ Loading FFmpeg...');
       await ffmpeg.load({
         coreURL: await toBlobURL('/ffmpeg-core.js', 'text/javascript'),
@@ -94,6 +98,9 @@ export async function combineVideos(videoUrls: string[]): Promise<Blob> {
 
     // Download and process each video
     for (let i = 0; i < videoUrls.length; i++) {
+      const downloadProgress = (i / videoUrls.length) * 30; // First 30% for downloading
+      onProgress?.(downloadProgress, `Downloading video ${i + 1} of ${videoUrls.length}`);
+      
       console.log(`\n📽️ Processing video ${i + 1} of ${videoUrls.length}`);
       console.log('🔗 Source:', videoUrls[i]);
       
@@ -107,19 +114,25 @@ export async function combineVideos(videoUrls: string[]): Promise<Blob> {
         const sizeMB = (videoBlob.size / (1024 * 1024)).toFixed(2);
         console.log(`✅ Video ${i + 1} downloaded (${sizeMB} MB)`);
         
+        const processProgress = 30 + ((i / videoUrls.length) * 30); // 30-60% for processing
+        onProgress?.(processProgress, `Converting video ${i + 1} of ${videoUrls.length}`);
+        
         // Write the original video to FFmpeg filesystem
         const inputFileName = `input${i}.mov`;
         console.log(`💾 Writing to FFmpeg as ${inputFileName}...`);
         await ffmpeg.writeFile(inputFileName, await fetchFile(videoBlob));
         console.log('✅ Write complete');
         
-        // Convert MOV to MP4
+        // Convert MOV to MP4 with optimized settings
         console.log(`🔄 Converting to MP4...`);
         await ffmpeg.exec([
           '-i', inputFileName,
           '-c:v', 'libx264',
-          '-preset', 'medium',
-          '-crf', '23',
+          '-preset', 'ultrafast', // Changed from 'medium' to 'ultrafast' for speed
+          '-crf', '28', // Slightly reduced quality for better speed (23 -> 28)
+          '-tune', 'fastdecode',
+          '-movflags', '+faststart',
+          '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', // Ensure even dimensions
           `video${i}.mp4`
         ]);
         
@@ -133,35 +146,42 @@ export async function combineVideos(videoUrls: string[]): Promise<Blob> {
     }
 
     // Create concatenation file list
+    onProgress?.(65, 'Preparing for combination...');
     const concatContent = videoUrls.map((_, i) => {
       return `file 'video${i}.mp4'`;
     }).join('\n');
     console.log('Creating concat file with content:', concatContent);
     await ffmpeg.writeFile('filelist.txt', new TextEncoder().encode(concatContent));
 
-    // Run FFmpeg command to merge videos
+    // Run FFmpeg command to merge videos with optimized settings
+    onProgress?.(70, 'Combining videos...');
     console.log('Running FFmpeg concat command...');
     await ffmpeg.exec([
       '-f', 'concat',
       '-safe', '0',
       '-i', 'filelist.txt',
-      '-c:v', 'libx264', // Use H.264 codec for compatibility
-      '-preset', 'medium', // Balance between speed and quality
-      '-crf', '23', // Reasonable quality setting
+      '-c:v', 'libx264',
+      '-preset', 'ultrafast',
+      '-crf', '28',
+      '-tune', 'fastdecode',
+      '-movflags', '+faststart',
       'output.mp4'
     ]);
 
-    // Read the output file
+    onProgress?.(85, 'Reading final video...');
     console.log('Reading output file...');
     const data = await ffmpeg.readFile('output.mp4');
 
     // Clean up files
+    onProgress?.(95, 'Cleaning up...');
     console.log('Cleaning up temporary files...');
     for (let i = 0; i < videoUrls.length; i++) {
       await ffmpeg.deleteFile(`video${i}.mp4`);
     }
     await ffmpeg.deleteFile('filelist.txt');
     await ffmpeg.deleteFile('output.mp4');
+
+    onProgress?.(100, 'Complete!');
 
     // Create output blob
     console.log('Creating output blob...');
@@ -172,10 +192,15 @@ export async function combineVideos(videoUrls: string[]): Promise<Blob> {
   }
 }
 
-export async function addAudioToVideo(videoBlob: Blob, audioBlob: Blob): Promise<Blob> {
+export async function addAudioToVideo(
+  videoBlob: Blob, 
+  audioBlob: Blob,
+  onProgress?: (progress: number, stage: string) => void
+): Promise<Blob> {
   try {
     // Load FFmpeg if not already loaded
     if (!ffmpeg.loaded) {
+      onProgress?.(0, 'Loading FFmpeg...');
       console.log('Loading FFmpeg...');
       await ffmpeg.load({
         coreURL: await toBlobURL('/ffmpeg-core.js', 'text/javascript'),
@@ -184,14 +209,19 @@ export async function addAudioToVideo(videoBlob: Blob, audioBlob: Blob): Promise
       console.log('FFmpeg loaded successfully');
     }
 
+    onProgress?.(10, 'Processing video...');
     console.log('Starting audio addition process...');
 
     // Write input files to FFmpeg filesystem
     console.log('Writing files to FFmpeg filesystem...');
+    onProgress?.(20, 'Preparing video file...');
     await ffmpeg.writeFile('input.mp4', await fetchFile(videoBlob));
+    
+    onProgress?.(40, 'Preparing audio file...');
     await ffmpeg.writeFile('audio.mp3', await fetchFile(audioBlob));
 
     // Add audio to video
+    onProgress?.(60, 'Combining audio and video...');
     console.log('Running FFmpeg command to add audio...');
     await ffmpeg.exec([
       '-i', 'input.mp4',
@@ -204,18 +234,24 @@ export async function addAudioToVideo(videoBlob: Blob, audioBlob: Blob): Promise
     ]);
 
     // Read the output file
+    onProgress?.(80, 'Finalizing video...');
     console.log('Reading output file...');
     const data = await ffmpeg.readFile('output.mp4');
 
     // Clean up
+    onProgress?.(90, 'Cleaning up...');
     console.log('Cleaning up temporary files...');
     await ffmpeg.deleteFile('input.mp4');
     await ffmpeg.deleteFile('audio.mp3');
     await ffmpeg.deleteFile('output.mp4');
 
     // Create output blob
+    onProgress?.(95, 'Creating final video file...');
     console.log('Creating output blob...');
-    return new Blob([data], { type: 'video/mp4' });
+    const finalBlob = new Blob([data], { type: 'video/mp4' });
+    
+    onProgress?.(100, 'Complete!');
+    return finalBlob;
   } catch (error) {
     console.error('Error in addAudioToVideo:', error);
     throw new Error(`Failed to add audio to video: ${error instanceof Error ? error.message : 'Unknown error'}`);

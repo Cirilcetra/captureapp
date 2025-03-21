@@ -14,6 +14,10 @@ export default function FinalPreview() {
   const [processing, setProcessing] = useState(false);
   const [generatingAudio, setGeneratingAudio] = useState(false);
   const [combiningVideos, setCombiningVideos] = useState(false);
+  const [combineProgress, setCombineProgress] = useState(0);
+  const [combineStage, setCombineStage] = useState('');
+  const [audioProgress, setAudioProgress] = useState(0);
+  const [audioStage, setAudioStage] = useState('');
   const [availableVoices, setAvailableVoices] = useState<Voice[]>([]);
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>("");
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -163,6 +167,8 @@ export default function FinalPreview() {
     }
     
     setCombiningVideos(true);
+    setCombineProgress(0);
+    setCombineStage('Starting...');
     setDebugInfo(prev => prev + "\nStarting video combination process");
     
     try {
@@ -174,9 +180,16 @@ export default function FinalPreview() {
         return shot.videoUrl;
       });
       
-      // Combine the videos
+      // Combine the videos with progress tracking
       toast.info("Combining videos... This may take a moment.");
-      const combinedBlob = await combineVideos(videoUrls);
+      const combinedBlob = await combineVideos(
+        videoUrls,
+        (progress, stage) => {
+          setCombineProgress(progress);
+          setCombineStage(stage);
+        }
+      );
+      
       console.log("Videos combined successfully, combined size:", combinedBlob.size);
       setDebugInfo(prev => prev + `\nVideos combined: ${combinedBlob.size} bytes`);
       
@@ -202,36 +215,83 @@ export default function FinalPreview() {
       toast.error(`Failed to combine videos: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
       setCombiningVideos(false);
+      setCombineProgress(0);
+      setCombineStage('');
     }
   };
   
   // Add audio narration to the combined video
   const handleAddAudioToVideo = async () => {
-    if (!combinedVideoBlob || !audioBlob || !currentProject) {
-      toast.error("Missing video, audio, or project for final production");
+    if (!currentProject) {
+      toast.error("No project available");
+      return;
+    }
+
+    if ((!combinedVideoBlob && !currentProject.finalVideoUrl) || 
+        (!audioBlob && !currentProject.narrationUrl)) {
+      toast.error("Missing video or audio for final production");
       return;
     }
     
     setProcessing(true);
+    setAudioProgress(0);
+    setAudioStage('Starting...');
     setDebugInfo(prev => prev + "\nStarting to add audio to video");
     
     try {
       console.log("Adding audio to video");
       toast.info("Creating final video... This may take a minute.");
+
+      // Get video blob - either use local blob or download from Firebase
+      let videoToUse = combinedVideoBlob;
+      if (!videoToUse && currentProject.finalVideoUrl) {
+        console.log("Downloading video from Firebase...");
+        setAudioStage('Downloading video from Firebase...');
+        setAudioProgress(10);
+        const response = await fetch(currentProject.finalVideoUrl);
+        videoToUse = await response.blob();
+      }
+
+      // Get audio blob - either use local blob or download from Firebase
+      let audioToUse = audioBlob;
+      if (!audioToUse && currentProject.narrationUrl) {
+        console.log("Downloading audio from Firebase...");
+        setAudioStage('Downloading audio from Firebase...');
+        setAudioProgress(20);
+        const response = await fetch(currentProject.narrationUrl);
+        audioToUse = await response.blob();
+      }
+
+      if (!videoToUse || !audioToUse) {
+        throw new Error("Failed to get video or audio content");
+      }
       
-      const finalVideoBlob = await addAudioToVideo(combinedVideoBlob, audioBlob);
+      const finalVideoBlob = await addAudioToVideo(
+        videoToUse, 
+        audioToUse,
+        (progress, stage) => {
+          setAudioProgress(30 + (progress * 0.5)); // Scale progress to 30-80%
+          setAudioStage(stage);
+        }
+      );
+      
       console.log("Audio added to video, final size:", finalVideoBlob.size);
       setDebugInfo(prev => prev + `\nFinal video created: ${finalVideoBlob.size} bytes`);
       
       // Upload final video to Firebase Storage
+      setAudioStage('Uploading final video...');
+      setAudioProgress(90);
       const finalVideoId = `${currentProject.id}-final-${Date.now()}`;
       toast.info("Uploading final video...");
       const downloadURL = await uploadVideo(finalVideoId, finalVideoBlob, 'video');
       
       // Update the store with the Firebase download URL and ID
+      setAudioProgress(95);
       setFinalVideo(currentProject.id, downloadURL, finalVideoId);
       completeProject(currentProject.id);
       
+      setAudioProgress(100);
+      setAudioStage('Complete!');
       toast.success("Final video created and stored successfully!");
       
       // Set the video source to the Firebase URL
@@ -248,6 +308,8 @@ export default function FinalPreview() {
       toast.error(`Failed to create final video: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
       setProcessing(false);
+      setAudioProgress(0);
+      setAudioStage('');
     }
   };
   
@@ -314,21 +376,55 @@ export default function FinalPreview() {
           <CardContent className="space-y-4">
             {renderAudioSection()}
             
-            <Button
-              onClick={handleCombineVideos}
-              disabled={combiningVideos || !currentProject?.shots.every(shot => shot.completed)}
-              className="w-full"
-            >
-              {combiningVideos ? "Combining Videos..." : "Combine Videos"}
-            </Button>
+            <div className="space-y-2">
+              <Button
+                onClick={handleCombineVideos}
+                disabled={combiningVideos || !currentProject?.shots.every(shot => shot.completed)}
+                className="w-full"
+              >
+                {combiningVideos ? "Combining Videos..." : "Combine Videos"}
+              </Button>
+              
+              {combiningVideos && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>{combineStage}</span>
+                    <span>{Math.round(combineProgress)}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
+                    <div 
+                      className="bg-primary h-2 rounded-full transition-all duration-300" 
+                      style={{ width: `${combineProgress}%` }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+            </div>
             
-            <Button
-              onClick={handleAddAudioToVideo}
-              disabled={processing || !combinedVideoBlob || (!audioBlob && !currentProject?.narrationUrl)}
-              className="w-full"
-            >
-              {processing ? "Creating Final Video..." : "Add Audio to Video"}
-            </Button>
+            <div className="space-y-2">
+              <Button
+                onClick={handleAddAudioToVideo}
+                disabled={processing || !combinedVideoBlob || (!audioBlob && !currentProject?.narrationUrl)}
+                className="w-full"
+              >
+                {processing ? "Creating Final Video..." : "Add Audio to Video"}
+              </Button>
+
+              {processing && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>{audioStage}</span>
+                    <span>{Math.round(audioProgress)}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
+                    <div 
+                      className="bg-primary h-2 rounded-full transition-all duration-300" 
+                      style={{ width: `${audioProgress}%` }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+            </div>
             
             {/* Debug Info */}
             {process.env.NODE_ENV === 'development' && debugInfo && (
