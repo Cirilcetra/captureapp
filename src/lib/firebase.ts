@@ -6,20 +6,22 @@ import { getStorage, ref, uploadBytes, uploadString, getDownloadURL, deleteObjec
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, User } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
-// Firebase configuration from environment variables
+// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const storage = getStorage(app);
+
+// Initialize Cloud Storage and get a reference to the service
+export const storage = getStorage(app);
+
 const auth = getAuth(app);
 const db = getFirestore(app);
 
@@ -76,7 +78,7 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
  */
 export const deleteVideo = async (id: string): Promise<void> => {
   try {
-    const videoRef = ref(storage, `videos/${id}.webm`);
+    const videoRef = ref(storage, `videos/${id}`);
     await deleteObject(videoRef);
     console.log(`Video deleted successfully: ${id}`);
   } catch (error) {
@@ -113,4 +115,7 @@ export const logOut = async () => {
   return signOut(auth);
 };
 
-export { storage, auth, db }; 
+export { auth, db };
+
+// Export the app instance if needed elsewhere
+export default app; 
