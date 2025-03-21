@@ -128,9 +128,11 @@ export default function ProjectPage() {
               {new Date(currentProject.createdAt).toLocaleDateString()}
             </p>
           </div>
-          <Link href="/">
-            <Button variant="outline">Back to Projects</Button>
-          </Link>
+          <div>
+            <Link href="/">
+              <Button variant="outline">Back to Projects</Button>
+            </Link>
+          </div>
         </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">

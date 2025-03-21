@@ -156,12 +156,25 @@ export const getUserProjects = async (): Promise<CarProject[]> => {
     
     querySnapshot.forEach((doc) => {
       const data = doc.data() as DocumentData;
-      // Convert Firestore timestamps to ISO strings for consistency
+      
+      // Safely convert timestamps or use the original value if it's already a string
+      const createdAt = data.createdAt instanceof Timestamp 
+        ? data.createdAt.toDate().toISOString() 
+        : typeof data.createdAt === 'string' 
+          ? data.createdAt 
+          : new Date().toISOString();
+
+      const updatedAt = data.updatedAt instanceof Timestamp 
+        ? data.updatedAt.toDate().toISOString() 
+        : typeof data.updatedAt === 'string' 
+          ? data.updatedAt 
+          : new Date().toISOString();
+      
       projects.push({
         ...data,
         id: doc.id,
-        createdAt: data.createdAt?.toDate()?.toISOString() || new Date().toISOString(),
-        updatedAt: data.updatedAt?.toDate()?.toISOString() || new Date().toISOString(),
+        createdAt,
+        updatedAt,
       } as CarProject);
     });
     
@@ -204,11 +217,24 @@ export const getProject = async (projectId: string): Promise<CarProject | null> 
       throw new Error('Not authorized to access this project');
     }
     
+    // Safely convert timestamps
+    const createdAt = data.createdAt instanceof Timestamp 
+      ? data.createdAt.toDate().toISOString() 
+      : typeof data.createdAt === 'string' 
+        ? data.createdAt 
+        : new Date().toISOString();
+
+    const updatedAt = data.updatedAt instanceof Timestamp 
+      ? data.updatedAt.toDate().toISOString() 
+      : typeof data.updatedAt === 'string' 
+        ? data.updatedAt 
+        : new Date().toISOString();
+    
     return {
       ...data,
       id: projectSnap.id,
-      createdAt: data.createdAt?.toDate?.() || new Date().toISOString(),
-      updatedAt: data.updatedAt?.toDate?.() || new Date().toISOString(),
+      createdAt,
+      updatedAt,
     } as CarProject;
   } catch (error) {
     console.error('Error getting project from Firestore:', error);
