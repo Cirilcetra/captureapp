@@ -20,6 +20,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import Link from "next/link";
+import { useAuth } from "@/lib/auth-context";
 
 // Form validation schema
 const formSchema = z.object({
@@ -35,7 +36,8 @@ interface ProjectSelectorProps {
 
 export default function ProjectSelector({ projects, onSelectProject }: ProjectSelectorProps) {
   const [open, setOpen] = useState(false);
-  const { createProject } = useAppStore();
+  const { addProject } = useAppStore();
+  const { user } = useAuth();
   
   // Setup form
   const form = useForm<FormValues>({
@@ -49,9 +51,13 @@ export default function ProjectSelector({ projects, onSelectProject }: ProjectSe
   
   // Form submission handler
   const onSubmit = async (values: FormValues) => {
+    if (!user) {
+      toast.error("Please sign in to create a project");
+      return;
+    }
     setIsCreating(true);
     try {
-      await createProject(values.carId);
+      await addProject(user.uid, values.carId);
       setOpen(false);
       toast.success(`Project for "${values.carId}" created!`);
       form.reset();

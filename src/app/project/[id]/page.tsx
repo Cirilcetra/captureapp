@@ -10,11 +10,9 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import Header from "@/components/Header";
-
-// Dynamic imports for components that use FFmpeg
 import dynamic from 'next/dynamic';
 
-// Dynamically import components that depend on browser APIs
+// Dynamically import browser-dependent components
 const VideoCapture = dynamic(() => import('@/components/VideoCapture'), { 
   ssr: false,
   loading: () => <div className="p-8 text-center">Loading video capture component...</div>

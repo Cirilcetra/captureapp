@@ -18,6 +18,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/auth-context";
 
 // Form validation schema
 const formSchema = z.object({
@@ -28,7 +29,8 @@ type FormValues = z.infer<typeof formSchema>;
 
 export default function EmptyState() {
   const [open, setOpen] = useState(false);
-  const { createProject } = useAppStore();
+  const { addProject } = useAppStore();
+  const { user } = useAuth();
   
   // Setup form
   const form = useForm<FormValues>({
@@ -40,7 +42,11 @@ export default function EmptyState() {
   
   // Form submission handler
   const onSubmit = (values: FormValues) => {
-    createProject(values.carId);
+    if (!user) {
+      toast.error("Please sign in to create a project");
+      return;
+    }
+    addProject(user.uid, values.carId);
     setOpen(false);
     toast.success(`Project for "${values.carId}" created!`);
     form.reset();

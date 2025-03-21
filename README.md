@@ -22,6 +22,7 @@ A Next.js application for capturing and creating professional car videos with AI
 - **FFmpeg WASM**: For client-side video processing
 - **OpenAI API**: For script generation
 - **ElevenLabs API**: For optional text-to-speech
+- **Web Video Editor API**: For client-side video processing and combining
 
 ## Prerequisites
 

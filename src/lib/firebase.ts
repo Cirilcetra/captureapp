@@ -24,62 +24,35 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 /**
- * Upload a video blob to Firebase Storage
- * @param id Unique ID for the video
- * @param videoBlob Video blob to upload
- * @returns Download URL for the uploaded video
+ * Upload a video or audio file to Firebase Storage
+ * @param fileId Unique identifier for the file
+ * @param file File blob to upload
+ * @param type Optional type ('video' or 'narration'), defaults to 'video'
+ * @returns Download URL of the uploaded file
  */
-export const uploadVideo = async (id: string, videoBlob: Blob): Promise<string> => {
+export const uploadVideo = async (fileId: string, file: Blob, type: 'video' | 'narration' = 'video'): Promise<string> => {
   try {
-    console.log(`Starting video upload for ID: ${id}, blob size: ${videoBlob.size} bytes`);
-    
-    // Always use base64 to avoid CORS issues - this is the most reliable approach
-    const useBase64 = true;
-    
-    // Include user ID in the path to ensure privacy and security
-    // Format: videos/userId/videoId.webm
-    const userId = auth.currentUser?.uid;
-    if (!userId) {
-      throw new Error("User is not authenticated");
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error('User not authenticated');
     }
+
+    // Create reference based on type
+    const path = type === 'video' ? 'videos' : 'narrations';
+    const storageRef = ref(storage, `${path}/${user.uid}/${fileId}`);
     
-    const storagePath = `videos/${userId}/${id}.webm`;
-    console.log(`Storage path: ${storagePath}`);
+    // Upload the file
+    const snapshot = await uploadBytes(storageRef, file);
+    console.log(`${type} uploaded successfully:`, snapshot);
     
-    // Create a storage reference
-    const videoRef = ref(storage, storagePath);
+    // Get download URL
+    const downloadURL = await getDownloadURL(snapshot.ref);
+    console.log(`${type} download URL:`, downloadURL);
     
-    if (useBase64) {
-      // Convert blob to base64 - this avoids CORS issues with binary uploads
-      console.log("Converting blob to base64...");
-      const base64 = await blobToBase64(videoBlob);
-      
-      // Upload the base64 string
-      console.log("Uploading base64 string...");
-      await uploadString(videoRef, base64, 'data_url');
-      console.log("Base64 upload complete");
-    } else {
-      // Upload the video blob directly - this may be affected by CORS
-      console.log("Uploading binary blob...");
-      await uploadBytes(videoRef, videoBlob);
-      console.log("Binary upload complete");
-    }
-    
-    // Get the download URL
-    console.log("Getting download URL...");
-    const downloadURL = await getDownloadURL(videoRef);
-    
-    console.log(`Video uploaded successfully: ${id}`);
     return downloadURL;
   } catch (error) {
-    console.error("Error uploading video:", error);
-    
-    // Provide more detailed error information
-    if (error instanceof Error) {
-      throw new Error(`Failed to upload video: ${error.message}`);
-    } else {
-      throw new Error("Failed to upload video: Unknown error");
-    }
+    console.error(`Error uploading ${type}:`, error);
+    throw error;
   }
 };
 

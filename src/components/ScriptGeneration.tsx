@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useAppStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import { generateScript } from "@/lib/openai";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { Loader2 } from "lucide-react";
 
 interface ScriptGenerationProps {
   onScriptGenerated: () => void;
@@ -32,15 +33,16 @@ export default function ScriptGeneration({ onScriptGenerated }: ScriptGeneration
       carDetails: currentProject?.scriptData || "",
     },
   });
-  
-  // Handle form submission
+
+  // Handle script generation
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!currentProject) return;
     
-    setScriptData(currentProject.id, values.carDetails);
     setGenerating(true);
-    
     try {
+      // Save car details
+      setScriptData(currentProject.id, values.carDetails);
+      
       // Get shot descriptions for context
       const shotDescriptions = currentProject.shots.map(shot => 
         `${shot.angle}: ${shot.description}`
@@ -50,9 +52,10 @@ export default function ScriptGeneration({ onScriptGenerated }: ScriptGeneration
       const script = await generateScript(values.carDetails, shotDescriptions);
       
       // Save the generated script
-      setGeneratedScript(currentProject.id, script);
+      await setGeneratedScript(currentProject.id, script);
+      
       toast.success("Script generated successfully!");
-      onScriptGenerated();
+      onScriptGenerated(); // Move to next step
     } catch (error) {
       console.error("Error generating script:", error);
       toast.error("Failed to generate script. Please try again.");
@@ -60,7 +63,7 @@ export default function ScriptGeneration({ onScriptGenerated }: ScriptGeneration
       setGenerating(false);
     }
   }
-  
+
   const handleAutoFill = () => {
     if (!currentProject) return;
     
@@ -108,50 +111,36 @@ export default function ScriptGeneration({ onScriptGenerated }: ScriptGeneration
                     </FormControl>
                     <FormDescription>
                       The more details you provide, the better the script will be.
+                      The script will be automatically matched to your shot sequence.
                     </FormDescription>
                   </FormItem>
                 )}
               />
               
-              <Button 
-                type="submit" 
-                className="w-full"
-                disabled={generating}
-              >
-                {generating ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Generating Script...
-                  </>
-                ) : 'Generate Script'}
-              </Button>
+              <div className="space-y-4">
+                <Button 
+                  type="submit" 
+                  className="w-full"
+                  disabled={generating}
+                >
+                  {generating ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Generating Script...
+                    </>
+                  ) : 'Generate Script'}
+                </Button>
+
+                {currentProject.generatedScript && (
+                  <div className="bg-muted p-4 rounded-md whitespace-pre-wrap">
+                    {currentProject.generatedScript}
+                  </div>
+                )}
+              </div>
             </form>
           </Form>
         </CardContent>
       </Card>
-      
-      {currentProject.generatedScript && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Generated Script</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="bg-muted p-4 rounded-md whitespace-pre-wrap">
-              {currentProject.generatedScript}
-            </div>
-            
-            <Button
-              className="w-full mt-4"
-              onClick={onScriptGenerated}
-            >
-              Continue to Final Preview
-            </Button>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 } 

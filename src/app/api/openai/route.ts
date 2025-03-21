@@ -88,7 +88,9 @@ export async function POST(request: NextRequest) {
           { role: "system", content: "You are a professional automotive copywriter who creates concise, engaging scripts for car promotion videos." },
           { role: "user", content: prompt }
         ],
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o-mini",
+        temperature: 0.7,
+        max_tokens: 500
       });
 
       const scriptContent = completion.choices[0]?.message?.content || "Error generating script. Please try again.";

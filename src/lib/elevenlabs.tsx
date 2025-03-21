@@ -44,16 +44,33 @@ export async function generateNarration(
     
     if (!response.ok) {
       // Try to get error details
-      const errorData = await response.json().catch(() => ({}));
-      console.error(`ElevenLabs API route error (${response.status}):`, errorData);
-      throw new Error(`ElevenLabs error: ${response.statusText}`);
+      let errorMessage: string;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || response.statusText;
+      } catch {
+        errorMessage = response.statusText;
+      }
+
+      console.error(`ElevenLabs API route error (${response.status}):`, errorMessage);
+
+      // Throw a more descriptive error
+      if (response.status === 401) {
+        throw new Error("Invalid API key. Please check your ElevenLabs API key in .env.local");
+      } else {
+        throw new Error(errorMessage);
+      }
     }
     
     // Get the audio blob directly
-    return await response.blob();
+    const blob = await response.blob();
+    if (blob.size === 0) {
+      throw new Error("Generated audio is empty. Please try again.");
+    }
+    return blob;
   } catch (error) {
     console.error("Error generating narration:", error);
-    throw new Error("Failed to generate narration. Please try again.");
+    throw error; // Re-throw the error to be handled by the caller
   }
 }
 

@@ -10,12 +10,14 @@ import EmptyState from "@/components/EmptyState";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { getUserProjects as fetchFirestoreProjects } from "@/lib/firestore";
 import { toast } from "sonner";
+import { CarProject } from '@/lib/store';
 
 export default function Home() {
   const { getUserProjects, currentProject, setCurrentProject } = useAppStore();
   const { user } = useAuth();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
+  const [projects, setProjects] = useState<CarProject[]>([]);
 
   // Fetch user projects from Firestore when authenticated
   useEffect(() => {
@@ -24,7 +26,8 @@ export default function Home() {
         setIsLoading(true);
         try {
           // Get projects from Firestore
-          await fetchFirestoreProjects();
+          const userProjects = await getUserProjects();
+          setProjects(userProjects);
           console.log("Projects loaded from Firestore");
         } catch (error) {
           console.error("Error loading projects from Firestore:", error);
@@ -38,10 +41,7 @@ export default function Home() {
     }
     
     loadFirestoreProjects();
-  }, [user]);
-
-  // Get only the projects for the current user
-  const userProjects = getUserProjects();
+  }, [user, getUserProjects]);
 
   return (
     <ProtectedRoute>
@@ -55,9 +55,9 @@ export default function Home() {
                 <p className="text-muted-foreground">Loading your projects...</p>
               </div>
             </div>
-          ) : userProjects.length > 0 ? (
+          ) : projects.length > 0 ? (
             <ProjectSelector 
-              projects={userProjects} 
+              projects={projects} 
               onSelectProject={(id) => setCurrentProject(id)}
             />
           ) : (

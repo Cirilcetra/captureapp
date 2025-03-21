@@ -75,27 +75,37 @@ export const saveProject = async (project: CarProject): Promise<boolean> => {
  * Update an existing project in Firestore
  * 
  * @param projectId Firestore document ID
- * @param project Project data to update
+ * @param updates Partial project data to update
  */
-export const updateProject = async (projectId: string, project: CarProject): Promise<boolean> => {
+export const updateProject = async (projectId: string, updates: Partial<CarProject>): Promise<boolean> => {
   const user = ensureAuth();
   if (!user) return false;
 
-  // Ensure project has user ID and belongs to current user
-  if (!project.userId || project.userId !== user.uid) {
-    console.error("Project does not belong to the authenticated user");
-    return false;
-  }
-
   try {
-    // Update with server timestamp
-    const updateData = {
-      ...project,
-      updatedAt: Timestamp.fromDate(new Date()),
-    };
-
+    // Get the project first to verify ownership
     const projectRef = doc(db, projectsCollection, projectId);
-    await updateDoc(projectRef, updateData);
+    const projectSnap = await getDoc(projectRef);
+    
+    if (!projectSnap.exists()) {
+      console.error("Project not found");
+      return false;
+    }
+
+    const projectData = projectSnap.data() as CarProject;
+    
+    // Verify project ownership
+    if (projectData.userId !== user.uid) {
+      console.error("Project does not belong to the authenticated user");
+      toast.error("You don't have permission to update this project");
+      return false;
+    }
+
+    // Update only the provided fields
+    await updateDoc(projectRef, {
+      ...updates,
+      updatedAt: serverTimestamp()
+    });
+
     return true;
   } catch (error) {
     console.error("Error updating project:", error);
