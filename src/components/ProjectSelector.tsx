@@ -30,7 +30,7 @@ type FormValues = z.infer<typeof formSchema>;
 
 interface ProjectSelectorProps {
   projects: CarProject[];
-  onSelectProject: (id: string) => void;
+  onSelectProject?: (id: string) => void; // Make this optional since we'll use direct navigation
 }
 
 export default function ProjectSelector({ projects, onSelectProject }: ProjectSelectorProps) {
@@ -121,10 +121,11 @@ export default function ProjectSelector({ projects, onSelectProject }: ProjectSe
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {projects.map((project) => (
-          <div
+          <Link
             key={project.id}
+            href={`/project/${project.id}`}
             className="cursor-pointer"
-            onClick={() => onSelectProject(project.id)}
+            onClick={() => onSelectProject && onSelectProject(project.id)}
           >
             <Card className="h-full hover:shadow-md transition-shadow">
               <CardHeader>
@@ -153,7 +154,7 @@ export default function ProjectSelector({ projects, onSelectProject }: ProjectSe
                 </div>
               </CardFooter>
             </Card>
-          </div>
+          </Link>
         ))}
         
         {/* Add new project card */}

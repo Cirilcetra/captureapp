@@ -31,32 +31,55 @@ const db = getFirestore(app);
  */
 export const uploadVideo = async (id: string, videoBlob: Blob): Promise<string> => {
   try {
-    // For development, if CORS is an issue, we can convert the blob to base64
-    // Note: this is less efficient but works around CORS issues
-    const useBase64ForCORS = true; // Set to false in production
+    console.log(`Starting video upload for ID: ${id}, blob size: ${videoBlob.size} bytes`);
+    
+    // Always use base64 to avoid CORS issues - this is the most reliable approach
+    const useBase64 = true;
+    
+    // Include user ID in the path to ensure privacy and security
+    // Format: videos/userId/videoId.webm
+    const userId = auth.currentUser?.uid;
+    if (!userId) {
+      throw new Error("User is not authenticated");
+    }
+    
+    const storagePath = `videos/${userId}/${id}.webm`;
+    console.log(`Storage path: ${storagePath}`);
     
     // Create a storage reference
-    const videoRef = ref(storage, `videos/${id}.webm`);
+    const videoRef = ref(storage, storagePath);
     
-    if (useBase64ForCORS) {
-      // Convert blob to base64
+    if (useBase64) {
+      // Convert blob to base64 - this avoids CORS issues with binary uploads
+      console.log("Converting blob to base64...");
       const base64 = await blobToBase64(videoBlob);
       
       // Upload the base64 string
+      console.log("Uploading base64 string...");
       await uploadString(videoRef, base64, 'data_url');
+      console.log("Base64 upload complete");
     } else {
-      // Upload the video blob directly
+      // Upload the video blob directly - this may be affected by CORS
+      console.log("Uploading binary blob...");
       await uploadBytes(videoRef, videoBlob);
+      console.log("Binary upload complete");
     }
     
     // Get the download URL
+    console.log("Getting download URL...");
     const downloadURL = await getDownloadURL(videoRef);
     
     console.log(`Video uploaded successfully: ${id}`);
     return downloadURL;
   } catch (error) {
     console.error("Error uploading video:", error);
-    throw error;
+    
+    // Provide more detailed error information
+    if (error instanceof Error) {
+      throw new Error(`Failed to upload video: ${error.message}`);
+    } else {
+      throw new Error("Failed to upload video: Unknown error");
+    }
   }
 };
 

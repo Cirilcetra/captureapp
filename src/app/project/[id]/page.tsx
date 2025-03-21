@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import Header from "@/components/Header";
 
 // Dynamic imports for components that use FFmpeg
 import dynamic from 'next/dynamic';
@@ -81,9 +82,13 @@ export default function ProjectPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-6 flex items-center justify-center h-screen">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold mb-2">Loading project...</h2>
+      <div className="flex min-h-screen flex-col">
+        <Header />
+        <div className="flex-1 container mx-auto px-4 py-6 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <h2 className="text-xl font-semibold">Loading project...</h2>
+          </div>
         </div>
       </div>
     );
@@ -91,71 +96,77 @@ export default function ProjectPage() {
 
   if (!currentProject) {
     return (
-      <div className="container mx-auto px-4 py-6 flex items-center justify-center h-screen">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle>Project Not Found</CardTitle>
-            <CardDescription>
-              The project you're looking for doesn't exist.
-            </CardDescription>
-          </CardHeader>
-          <CardFooter>
-            <Link href="/" className="w-full">
-              <Button className="w-full">Return to Home</Button>
-            </Link>
-          </CardFooter>
-        </Card>
+      <div className="flex min-h-screen flex-col">
+        <Header />
+        <div className="flex-1 container mx-auto px-4 py-6 flex items-center justify-center">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle>Project Not Found</CardTitle>
+              <CardDescription>
+                The project you're looking for doesn't exist.
+              </CardDescription>
+            </CardHeader>
+            <CardFooter>
+              <Link href="/" className="w-full">
+                <Button className="w-full">Return to Home</Button>
+              </Link>
+            </CardFooter>
+          </Card>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-5xl">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold">{currentProject.carId}</h1>
-          <p className="text-muted-foreground mt-1">
-            {new Date(currentProject.createdAt).toLocaleDateString()}
-          </p>
+    <div className="flex min-h-screen flex-col">
+      <Header />
+      <main className="flex-1 container mx-auto px-4 py-6">
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold">{currentProject.carId}</h1>
+            <p className="text-muted-foreground mt-1">
+              {new Date(currentProject.createdAt).toLocaleDateString()}
+            </p>
+          </div>
+          <Link href="/">
+            <Button variant="outline">Back to Projects</Button>
+          </Link>
         </div>
-        <Link href="/">
-          <Button variant="outline">Back to Projects</Button>
-        </Link>
-      </div>
 
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="capture">1. Capture Videos</TabsTrigger>
-          <TabsTrigger 
-            value="script" 
-            disabled={!canAccessScriptTab()}
-          >
-            2. Generate Script
-          </TabsTrigger>
-          <TabsTrigger 
-            value="preview" 
-            disabled={!canAccessPreviewTab()}
-          >
-            3. Final Preview
-          </TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="capture" className="mt-6">
-          <VideoCapture 
-            onAllCapturesComplete={() => handleTabChange("script")}
-          />
-        </TabsContent>
-        
-        <TabsContent value="script" className="mt-6">
-          <ScriptGeneration
-            onScriptGenerated={() => handleTabChange("preview")}
-          />
-        </TabsContent>
-        
-        <TabsContent value="preview" className="mt-6">
-          <FinalPreview />
-        </TabsContent>
-      </Tabs>
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="capture">1. Capture Videos</TabsTrigger>
+            <TabsTrigger 
+              value="script" 
+              disabled={!canAccessScriptTab()}
+            >
+              2. Generate Script
+            </TabsTrigger>
+            <TabsTrigger 
+              value="preview" 
+              disabled={!canAccessPreviewTab()}
+            >
+              3. Final Preview
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="capture" className="mt-6">
+            <VideoCapture 
+              onAllCapturesComplete={() => handleTabChange("script")}
+            />
+          </TabsContent>
+          
+          <TabsContent value="script" className="mt-6">
+            <ScriptGeneration
+              onScriptGenerated={() => handleTabChange("preview")}
+            />
+          </TabsContent>
+          
+          <TabsContent value="preview" className="mt-6">
+            <FinalPreview />
+          </TabsContent>
+        </Tabs>
+      </main>
     </div>
   );
 } 

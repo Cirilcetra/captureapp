@@ -15,24 +15,7 @@ export default function Home() {
   const { getUserProjects, currentProject, setCurrentProject } = useAppStore();
   const { user } = useAuth();
   const router = useRouter();
-  const [isRedirecting, setIsRedirecting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-
-  // If a project is selected, redirect to the capture page only once
-  useEffect(() => {
-    if (currentProject && !isRedirecting) {
-      // Set flag to prevent redirect loops
-      setIsRedirecting(true);
-      // Use sessionStorage to track redirects
-      sessionStorage.setItem('redirected_to_capture', 'true');
-      router.push("/capture");
-    }
-  }, [currentProject, router, isRedirecting]);
-
-  // Reset redirect flag when this component mounts
-  useEffect(() => {
-    sessionStorage.removeItem('redirected_to_capture');
-  }, []);
 
   // Fetch user projects from Firestore when authenticated
   useEffect(() => {
