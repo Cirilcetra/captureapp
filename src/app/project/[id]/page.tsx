@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import Header from "@/components/Header";
 import dynamic from 'next/dynamic';
+import { Camera, FileText, PlayCircle } from "lucide-react";
 
 // Dynamically import browser-dependent components
 const VideoCapture = dynamic(() => import('@/components/VideoCapture'), { 
@@ -32,9 +33,10 @@ export default function ProjectPage() {
   const router = useRouter();
   const params = useParams();
   const projectId = params.id as string;
-  const { projects, setCurrentProject, currentProject } = useAppStore();
+  const { projects, setCurrentProject, currentProject, deleteProject } = useAppStore();
   const [activeTab, setActiveTab] = useState("capture");
   const [loading, setLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Load current project based on URL param
   useEffect(() => {
@@ -49,6 +51,15 @@ export default function ProjectPage() {
     setCurrentProject(projectId);
     setLoading(false);
   }, [projectId, projects, setCurrentProject, router]);
+
+  useEffect(() => {
+    if (currentProject) {
+      // If final video is available, switch to final preview tab
+      if (currentProject.finalVideoUrl) {
+        setActiveTab("preview");
+      }
+    }
+  }, [currentProject]);
 
   // Determine if we can move to the script tab
   const canAccessScriptTab = () => {
@@ -65,23 +76,37 @@ export default function ProjectPage() {
 
   // Check conditions and control tab access
   const handleTabChange = (value: string) => {
+    // Check if we can move to the selected tab
     if (value === "script" && !canAccessScriptTab()) {
-      toast.error("Please complete all video captures first");
+      toast.error("Please capture all videos first");
       return;
     }
-    
     if (value === "preview" && !canAccessPreviewTab()) {
-      toast.error("Please generate a script first");
+      toast.error("Please generate the script first");
       return;
     }
-    
     setActiveTab(value);
+  };
+
+  const handleDeleteProject = async () => {
+    if (!currentProject) return;
+    
+    try {
+      setIsDeleting(true);
+      await deleteProject(currentProject.id);
+      toast.success("Project deleted successfully");
+      router.push("/");
+    } catch (error) {
+      console.error("Error deleting project:", error);
+      toast.error("Failed to delete project");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   if (loading) {
     return (
-      <div className="flex min-h-screen flex-col">
-        <Header />
+      <div className="min-h-[100dvh] flex flex-col pt-safe">
         <div className="flex-1 container mx-auto px-4 py-6 flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
@@ -94,8 +119,7 @@ export default function ProjectPage() {
 
   if (!currentProject) {
     return (
-      <div className="flex min-h-screen flex-col">
-        <Header />
+      <div className="min-h-[100dvh] flex flex-col pt-safe">
         <div className="flex-1 container mx-auto px-4 py-6 flex items-center justify-center">
           <Card className="w-full max-w-md">
             <CardHeader>
@@ -116,43 +140,54 @@ export default function ProjectPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="min-h-[100dvh] flex flex-col pt-safe">
       <Header />
-      <main className="flex-1 container mx-auto px-4 py-6">
-        <div className="flex justify-between items-center mb-8">
+      <main className="flex-1 container mx-auto px-4 md:px-6 py-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-bold">{currentProject.carId}</h1>
-            <p className="text-muted-foreground mt-1">
-              {new Date(currentProject.createdAt).toLocaleDateString()}
+            <h1 className="text-3xl font-bold tracking-tight">{currentProject.carId}</h1>
+            <p className="text-muted-foreground mt-1.5">
+              Created on {new Date(currentProject.createdAt).toLocaleDateString()}
             </p>
           </div>
-          <div>
+          <div className="flex gap-2">
             <Link href="/">
-              <Button variant="outline">Back to Projects</Button>
+              <Button variant="outline" className="shrink-0">
+                ← Back to Projects
+              </Button>
             </Link>
+            <Button 
+              variant="destructive" 
+              onClick={handleDeleteProject}
+              disabled={isDeleting}
+              className="shrink-0"
+            >
+              {isDeleting ? "Deleting..." : "Delete Project"}
+            </Button>
           </div>
         </div>
 
-        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="capture">1. Capture Videos</TabsTrigger>
-            <TabsTrigger 
-              value="script" 
-              disabled={!canAccessScriptTab()}
-            >
-              2. Generate Script
+        <Tabs value={activeTab} className="w-full" onValueChange={handleTabChange}>
+          <TabsList className="w-full">
+            <TabsTrigger value="capture" className="flex items-center gap-2 flex-1">
+              <Camera className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Capture</span>
             </TabsTrigger>
-            <TabsTrigger 
-              value="preview" 
-              disabled={!canAccessPreviewTab()}
-            >
-              3. Final Preview
+            <TabsTrigger value="script" className="flex items-center gap-2 flex-1">
+              <FileText className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Script</span>
+            </TabsTrigger>
+            <TabsTrigger value="preview" className="flex items-center gap-2 flex-1">
+              <PlayCircle className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Preview</span>
             </TabsTrigger>
           </TabsList>
           
           <TabsContent value="capture" className="mt-6">
             <VideoCapture 
-              onAllCapturesComplete={() => handleTabChange("script")}
+              onAllCapturesComplete={() => {
+                toast.success("All videos captured! You can now proceed to generate the script.");
+              }}
             />
           </TabsContent>
           

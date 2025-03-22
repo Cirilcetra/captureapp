@@ -7,6 +7,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { uploadVideo } from "@/lib/firebase";
+import { Loader2 } from "lucide-react";
 
 interface VideoCaptureProps {
   onAllCapturesComplete: () => void;
@@ -15,6 +16,7 @@ interface VideoCaptureProps {
 export default function VideoCapture({ onAllCapturesComplete }: VideoCaptureProps) {
   const { currentProject, updateShot } = useAppStore();
   const [processingVideo, setProcessingVideo] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedShotId, setSelectedShotId] = useState<string | null>(null);
   
@@ -48,13 +50,16 @@ export default function VideoCapture({ onAllCapturesComplete }: VideoCaptureProp
     }
     
     setProcessingVideo(true);
+    setUploadProgress(0);
     try {
       // Create a unique video ID
       const videoId = `${currentProject.id}-shot-${selectedShotId}-${Date.now()}`;
       
       // Upload the video to Firebase Storage
       toast.info("Uploading video...");
-      const downloadURL = await uploadVideo(videoId, file, 'video');
+      const downloadURL = await uploadVideo(videoId, file, 'video', (progress) => {
+        setUploadProgress(progress);
+      });
       
       // Save video URL and ID in the store
       await updateShot(currentProject.id, selectedShotId, downloadURL, videoId);
@@ -66,6 +71,7 @@ export default function VideoCapture({ onAllCapturesComplete }: VideoCaptureProp
       toast.error("Failed to save video. Please try again.");
     } finally {
       setProcessingVideo(false);
+      setUploadProgress(0);
       // Reset file input
       if (event.target) {
         event.target.value = '';
@@ -129,6 +135,16 @@ export default function VideoCapture({ onAllCapturesComplete }: VideoCaptureProp
                   />
                 </div>
               )}
+
+              {/* Show upload progress when processing */}
+              {processingVideo && selectedShotId === shot.id && uploadProgress > 0 && (
+                <div className="mb-4 space-y-2">
+                  <Progress value={uploadProgress} />
+                  <p className="text-sm text-center text-muted-foreground">
+                    Uploading... {uploadProgress.toFixed(0)}%
+                  </p>
+                </div>
+              )}
             </CardContent>
             <CardFooter>
               <Button 
@@ -140,7 +156,14 @@ export default function VideoCapture({ onAllCapturesComplete }: VideoCaptureProp
                 variant={shot.completed ? "outline" : "default"}
                 className="w-full"
               >
-                {shot.completed ? "Reshoot" : "Capture"}
+                {processingVideo && selectedShotId === shot.id ? (
+                  <span className="flex items-center">
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Uploading...
+                  </span>
+                ) : (
+                  shot.completed ? "Reshoot" : "Capture"
+                )}
               </Button>
             </CardFooter>
           </Card>

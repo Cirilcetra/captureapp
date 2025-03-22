@@ -69,45 +69,41 @@ export default function FinalPreview() {
 
       const videoUrls = validShots.map(shot => shot.videoUrl!);
       
-      // Step 1: Combine videos with muted audio
-      const combinedUrl = await combineVideosServer(
+      // Step 1: Always combine videos with muted audio first
+      const mutedVideoUrl = await combineVideosServer(
         currentProject.id,
         videoUrls,
         (progress, stage) => {
-          setCombineProgress(progress);
+          setCombineProgress(progress * 0.5); // First 50% for video combination
           setCombineStage(`Combining videos: ${stage}`);
-        },
-        true  // mute original audio
+        }
       );
 
-      // Step 2: If narration exists, add it to the combined video immediately
+      // Step 2: If narration exists, add it to the combined video
       if (currentProject.narrationUrl) {
         setCombineStage('Adding narration to video...');
-        setCombineProgress(0);
-
         const finalVideoUrl = await addAudioToVideoServer(
           currentProject.id,
-          combinedUrl,
+          mutedVideoUrl,
           currentProject.narrationUrl,
           (progress, stage) => {
-            setCombineProgress(progress);
+            setCombineProgress(50 + progress * 0.5); // Last 50% for adding narration
             setCombineStage(`Adding narration: ${stage}`);
           }
         );
 
-        // Save the final video URL and update preview
+        // Save and update preview with the final video
         const finalVideoId = `${currentProject.id}-final`;
         await setFinalVideo(currentProject.id, finalVideoUrl, finalVideoId);
         await completeProject(currentProject.id);
         setCombinedVideoUrl(finalVideoUrl);
-        
         toast.success("Videos combined with narration successfully!");
       } else {
-        // If no narration, save and show the muted combined video
+        // Save the muted combined video
         const finalVideoId = `${currentProject.id}-final`;
-        await setFinalVideo(currentProject.id, combinedUrl, finalVideoId);
+        await setFinalVideo(currentProject.id, mutedVideoUrl, finalVideoId);
         await completeProject(currentProject.id);
-        setCombinedVideoUrl(combinedUrl);
+        setCombinedVideoUrl(mutedVideoUrl);
         toast.success("Videos combined successfully!");
       }
     } catch (error) {
@@ -206,26 +202,49 @@ export default function FinalPreview() {
   
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Final Video Preview</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Video preview */}
-          {combinedVideoUrl && (
-            <div className="space-y-2">
-              <video
-                ref={videoRef}
-                src={combinedVideoUrl}
-                controls
-                className="w-full rounded-lg"
-                muted={!!currentProject?.narrationUrl} // Mute if narration exists
-              />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Video Preview Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Video Preview</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {combinedVideoUrl && (
+              <div className="space-y-2">
+                <video
+                  ref={videoRef}
+                  src={combinedVideoUrl}
+                  controls
+                  className="w-full rounded-lg"
+                  muted={!currentProject.finalVideoUrl}
+                />
+                <Button
+                  onClick={handleCombineVideos}
+                  variant="outline"
+                  className="w-full"
+                  disabled={combiningVideos}
+                >
+                  {combiningVideos ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      {combineStage} ({combineProgress}%)
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Recombine {currentProject.narrationUrl ? 'Video with Narration' : 'Videos'}
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+
+            {/* Initial combine button if no combined video exists */}
+            {!combinedVideoUrl && (
               <Button
                 onClick={handleCombineVideos}
-                variant="outline"
-                className="w-full"
                 disabled={combiningVideos}
+                className="w-full"
               >
                 {combiningVideos ? (
                   <>
@@ -233,125 +252,88 @@ export default function FinalPreview() {
                     {combineStage} ({combineProgress}%)
                   </>
                 ) : (
-                  <>
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Recombine {currentProject.narrationUrl ? 'Video with Narration' : 'Videos'}
-                  </>
+                  "Combine Videos"
                 )}
               </Button>
-            </div>
-          )}
+            )}
+          </CardContent>
+        </Card>
 
-          {/* Initial combine button if no combined video exists */}
-          {!combinedVideoUrl && (
-            <Button
-              onClick={handleCombineVideos}
-              disabled={combiningVideos}
-              className="w-full"
-            >
-              {combiningVideos ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  {combineStage} ({combineProgress}%)
-                </>
-              ) : (
-                "Combine Videos"
-              )}
-            </Button>
-          )}
+        {/* Narration Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Narration</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Voice selection and narration generation */}
+            {!currentProject.narrationUrl ? (
+              <div className="space-y-2">
+                <select
+                  value={selectedVoiceId}
+                  onChange={(e) => setSelectedVoiceId(e.target.value)}
+                  className="w-full p-2 rounded border"
+                >
+                  {availableVoices.map((voice) => (
+                    <option key={voice.voice_id} value={voice.voice_id}>
+                      {voice.name}
+                    </option>
+                  ))}
+                </select>
 
-          {/* Narration section */}
-          {combinedVideoUrl && (
-            <div className="space-y-4">
-              {currentProject.narrationUrl ? (
-                // Audio player for existing narration
-                <div className="space-y-2">
-                  <audio
-                    ref={audioRef}
-                    src={currentProject.narrationUrl}
-                    onEnded={() => setIsPlaying(false)}
-                    className="hidden"
-                  />
-                  <Button
-                    onClick={toggleAudioPlayback}
-                    variant="outline"
-                    className="w-full"
-                  >
-                    {isPlaying ? (
-                      <>
-                        <Pause className="w-4 h-4 mr-2" />
-                        Pause Narration
-                      </>
-                    ) : (
-                      <>
-                        <Play className="w-4 h-4 mr-2" />
-                        Play Narration
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    onClick={handleGenerateNarration}
-                    variant="outline"
-                    disabled={generatingAudio}
-                    className="w-full"
-                  >
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Regenerate Narration
-                  </Button>
-                </div>
-              ) : (
-                // Narration generation controls
-                <div className="space-y-2">
-                  <select
-                    value={selectedVoiceId}
-                    onChange={(e) => setSelectedVoiceId(e.target.value)}
-                    className="w-full p-2 rounded border"
-                  >
-                    {availableVoices.map((voice) => (
-                      <option key={voice.voice_id} value={voice.voice_id}>
-                        {voice.name}
-                      </option>
-                    ))}
-                  </select>
-
-                  <Button
-                    onClick={handleGenerateNarration}
-                    disabled={generatingAudio || !currentProject.generatedScript}
-                    className="w-full"
-                  >
-                    {generatingAudio ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        {audioStage} ({audioProgress}%)
-                      </>
-                    ) : (
-                      "Generate Narration"
-                    )}
-                  </Button>
-                </div>
-              )}
-
-              {/* Add audio button - only show if we have both video and narration but no final video */}
-              {combinedVideoUrl && currentProject.narrationUrl && !currentProject.finalVideoUrl && (
                 <Button
-                  onClick={handleAddAudioToVideo}
-                  disabled={processing}
+                  onClick={handleGenerateNarration}
+                  disabled={generatingAudio || !currentProject.generatedScript}
                   className="w-full"
                 >
-                  {processing ? (
+                  {generatingAudio ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                       {audioStage} ({audioProgress}%)
                     </>
                   ) : (
-                    "Add Narration to Video"
+                    "Generate Narration"
                   )}
                 </Button>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <audio
+                  ref={audioRef}
+                  src={currentProject.narrationUrl}
+                  controls
+                  className="w-full"
+                />
+                <Button
+                  onClick={handleGenerateNarration}
+                  variant="outline"
+                  className="w-full"
+                  disabled={generatingAudio}
+                >
+                  Regenerate Narration
+                </Button>
+              </div>
+            )}
+
+            {/* Add audio button - only show if we have both video and narration but no final video */}
+            {combinedVideoUrl && currentProject.narrationUrl && !currentProject.finalVideoUrl && (
+              <Button
+                onClick={handleAddAudioToVideo}
+                disabled={processing}
+                className="w-full"
+              >
+                {processing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    {audioStage} ({audioProgress}%)
+                  </>
+                ) : (
+                  "Add Narration to Video"
+                )}
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 } 

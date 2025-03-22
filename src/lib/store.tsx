@@ -3,7 +3,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { auth } from './firebase';
-import { saveProject, updateProject, getUserProjects as fetchUserProjects } from './firestore';
+import { saveProject, updateProject, getUserProjects as fetchUserProjects, deleteProject } from './firestore';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -44,6 +44,7 @@ interface AppState {
   setCurrentProject: (projectId: string) => void;
   setScriptData: (projectId: string, scriptData: string) => void;
   setGeneratedScript: (projectId: string, script: string) => void;
+  deleteProject: (projectId: string) => Promise<void>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -277,5 +278,21 @@ export const useAppStore = create<AppState>((set, get) => ({
         currentProject: updatedProjects.find(p => p.id === projectId) || null
       };
     });
+  },
+
+  deleteProject: async (projectId: string) => {
+    try {
+      // Delete from Firestore
+      await deleteProject(projectId);
+      
+      // Update local state
+      set((state) => ({
+        projects: state.projects.filter(p => p.id !== projectId),
+        currentProject: state.currentProject?.id === projectId ? null : state.currentProject
+      }));
+    } catch (error) {
+      console.error('Error deleting project:', error);
+      throw error;
+    }
   }
 })); 

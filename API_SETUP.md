@@ -4,19 +4,20 @@ This document explains how to set up the necessary API keys for the Capture App.
 
 ## Overview
 
-The Capture App uses two external API services:
+The Capture App uses a FastAPI backend that integrates with:
 
 1. **OpenAI API** - For generating promotional scripts
 2. **ElevenLabs API** - For text-to-speech narration
 
 ## Setting Up API Keys
 
-### Step 1: Create a `.env.local` file
+### Step 1: Create a `.env` file in the backend directory
 
-In the root directory of the project, create or edit a file called `.env.local`:
+In the `backend` directory, create or edit a file called `.env`:
 
 ```bash
-touch .env.local
+cd backend
+touch .env
 ```
 
 ### Step 2: Get Your API Keys
@@ -34,9 +35,9 @@ touch .env.local
 4. Select "Profile" from the dropdown menu
 5. Copy your API key
 
-### Step 3: Add Your API Keys to `.env.local`
+### Step 3: Add Your API Keys to `.env`
 
-Open the `.env.local` file and add the following lines:
+Open the `.env` file and add the following lines:
 
 ```
 # OpenAI API Key
@@ -44,26 +45,31 @@ OPENAI_API_KEY=your_openai_api_key_here
 
 # ElevenLabs API Key
 ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
+
+# Firebase settings (if using Firebase)
+STORAGE_BUCKET=your_firebase_storage_bucket
 ```
 
-Replace `your_openai_api_key_here` and `your_elevenlabs_api_key_here` with your actual API keys.
+Replace the placeholder values with your actual API keys.
 
-### Step 4: Restart Your Development Server
+### Step 4: Start the Backend Server
 
-If your development server is running, restart it to apply the changes:
+Start the FastAPI backend server:
 
 ```bash
-npm run dev
+cd backend
+uvicorn app.main:app --reload
 ```
 
 ## API Usage
 
-The app now uses secure API routes to handle external API calls:
+The app uses the FastAPI backend to handle all external API calls:
 
-- `/api/openai` - Handles OpenAI API calls
-- `/api/elevenlabs` - Handles ElevenLabs API calls
+- `/api/ai/script` - Generates scripts using OpenAI
+- `/api/ai/voices` - Gets available voices from ElevenLabs
+- `/api/ai/narration` - Generates narration using ElevenLabs
 
-These server-side API routes keep your API keys secure by not exposing them to the client.
+The backend handles all API keys securely, so no sensitive information is exposed to the frontend.
 
 ## Troubleshooting
 
@@ -71,7 +77,7 @@ These server-side API routes keep your API keys secure by not exposing them to t
 
 If you see "401 Unauthorized" errors in your console:
 
-1. Double-check that your API keys are correct
+1. Double-check that your API keys are correct in the backend `.env` file
 2. Make sure the API keys are properly formatted (no extra spaces)
 3. Verify that your ElevenLabs API key doesn't have a `sk_` prefix unless that's actually part of the key
 4. Confirm your OpenAI account has a valid payment method and sufficient credits
@@ -85,4 +91,4 @@ Both OpenAI and ElevenLabs have rate limits:
 
 ## Security Notice
 
-Never commit your `.env.local` file to version control. It should be listed in your `.gitignore` file to prevent accidental commits. 
+Never commit your `.env` file to version control. It should be listed in your `.gitignore` file to prevent accidental commits. 

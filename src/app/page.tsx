@@ -11,6 +11,11 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { getUserProjects as fetchFirestoreProjects } from "@/lib/firestore";
 import { toast } from "sonner";
 import { CarProject } from '@/lib/store';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogTrigger } from "@/components/ui/dialog";
+import { Plus } from "lucide-react";
 
 export default function Home() {
   const { getUserProjects, currentProject, setCurrentProject } = useAppStore();
@@ -18,6 +23,7 @@ export default function Home() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [projects, setProjects] = useState<CarProject[]>([]);
+  const [showNewProjectDialog, setShowNewProjectDialog] = useState(false);
 
   // Fetch user projects from Firestore when authenticated
   useEffect(() => {
@@ -45,9 +51,9 @@ export default function Home() {
 
   return (
     <ProtectedRoute>
-      <div className="flex min-h-screen flex-col">
+      <div className="min-h-[100dvh] flex flex-col pt-safe">
         <Header />
-        <main className="flex-1 container py-6 px-4 sm:px-6">
+        <main className="flex-1 container mx-auto px-4 md:px-6 py-8">
           {isLoading ? (
             <div className="flex justify-center items-center h-64">
               <div className="text-center">

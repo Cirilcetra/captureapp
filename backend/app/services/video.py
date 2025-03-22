@@ -30,6 +30,7 @@ class VideoProcessor:
                 stream,
                 str(output_path),
                 c='copy',  # Use copy codec for speed
+                an=None,  # Remove all audio streams
                 movflags='+faststart',
                 loglevel='error'  # Reduce logging noise
             )

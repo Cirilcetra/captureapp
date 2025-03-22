@@ -9,12 +9,9 @@ service firebase.storage {
     match /videos/{userId}/{videoId} {
       // Allow reading of videos for everyone (useful for Safari testing)
       allow read: if true;
-      // Only authenticated users can write their own videos with valid formats
+      // Only authenticated users can write their own videos
       allow write: if request.auth != null && 
-                  request.auth.uid == userId && 
-                  (request.resource.contentType.matches('video/webm') ||
-                   request.resource.contentType.matches('video/mp4') ||
-                   request.resource.contentType.matches('video/quicktime'));
+                  request.auth.uid == userId;
     }
     
     // Allow users to read and write their own narrations

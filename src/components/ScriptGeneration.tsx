@@ -11,7 +11,7 @@ import { generateScript } from "@/lib/api-client";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2 } from "lucide-react";
+import { Loader2, Save, RefreshCw, X } from "lucide-react";
 
 interface ScriptGenerationProps {
   onScriptGenerated: () => void;
@@ -20,17 +20,20 @@ interface ScriptGenerationProps {
 const formSchema = z.object({
   carDetails: z.string().min(10, {
     message: "Car details must be at least 10 characters long."
-  })
+  }),
+  generatedScript: z.string().optional()
 });
 
 export default function ScriptGeneration({ onScriptGenerated }: ScriptGenerationProps) {
   const { currentProject, setScriptData, setGeneratedScript } = useAppStore();
   const [generating, setGenerating] = useState(false);
+  const [editing, setEditing] = useState(false);
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       carDetails: currentProject?.scriptData || "",
+      generatedScript: currentProject?.generatedScript || ""
     },
   });
 
@@ -56,9 +59,10 @@ export default function ScriptGeneration({ onScriptGenerated }: ScriptGeneration
       
       // Save the generated script
       await setGeneratedScript(currentProject.id, script);
+      form.setValue("generatedScript", script);
       
-      toast.success("Script generated successfully!");
-      onScriptGenerated(); // Move to next step
+      // Move to next step without showing duplicate toast
+      onScriptGenerated();
     } catch (error) {
       console.error("Error generating script:", error);
       toast.error("Failed to generate script. Please try again.");
@@ -81,6 +85,37 @@ export default function ScriptGeneration({ onScriptGenerated }: ScriptGeneration
     form.setValue("carDetails", demoCarDetails);
   };
 
+  const handleSaveScript = async () => {
+    if (!currentProject) return;
+    
+    const script = form.getValues("generatedScript");
+    if (!script) {
+      toast.error("No script to save");
+      return;
+    }
+
+    try {
+      await setGeneratedScript(currentProject.id, script);
+      toast.success("Script saved successfully!");
+      setEditing(false);
+    } catch (error) {
+      console.error("Error saving script:", error);
+      toast.error("Failed to save script");
+    }
+  };
+
+  const handleEditScript = () => {
+    setEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    // Reset to the original script
+    if (currentProject?.generatedScript) {
+      form.setValue("generatedScript", currentProject.generatedScript);
+    }
+    setEditing(false);
+  };
+
   if (!currentProject) return null;
 
   return (
@@ -92,58 +127,101 @@ export default function ScriptGeneration({ onScriptGenerated }: ScriptGeneration
         </Button>
       </div>
       
-      <Card>
-        <CardHeader>
-          <CardTitle>Car Details</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Car Details Form */}
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <FormField
+              control={form.control}
+              name="carDetails"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Enter Car Details</FormLabel>
+                  <FormControl>
+                    <Textarea 
+                      placeholder="Enter detailed information about the car including model, features, specs, etc."
+                      className="min-h-[400px] resize-none"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    The more details you provide, the better the script will be.
+                    The script will be automatically matched to your shot sequence.
+                  </FormDescription>
+                </FormItem>
+              )}
+            />
+            
+            <Button 
+              type="submit" 
+              className="w-full"
+              disabled={generating}
+            >
+              {generating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Generating Script...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Generate Script
+                </>
+              )}
+            </Button>
+          </form>
+        </Form>
+
+        {/* Generated Script Display/Edit */}
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <div className="font-medium">Generated Script</div>
+            {currentProject.generatedScript && !editing && (
+              <Button variant="outline" size="sm" onClick={handleEditScript}>
+                Edit Script
+              </Button>
+            )}
+            {editing && (
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={handleCancelEdit}>
+                  <X className="h-4 w-4" />
+                </Button>
+                <Button variant="default" size="sm" onClick={handleSaveScript}>
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Changes
+                </Button>
+              </div>
+            )}
+          </div>
+          
+          {editing ? (
+            <Form {...form}>
               <FormField
                 control={form.control}
-                name="carDetails"
+                name="generatedScript"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Enter Car Details</FormLabel>
                     <FormControl>
                       <Textarea 
-                        placeholder="Enter detailed information about the car including model, features, specs, etc."
-                        className="min-h-[200px]"
+                        className="min-h-[400px] resize-none"
                         {...field}
                       />
                     </FormControl>
-                    <FormDescription>
-                      The more details you provide, the better the script will be.
-                      The script will be automatically matched to your shot sequence.
-                    </FormDescription>
                   </FormItem>
                 )}
               />
-              
-              <div className="space-y-4">
-                <Button 
-                  type="submit" 
-                  className="w-full"
-                  disabled={generating}
-                >
-                  {generating ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Generating Script...
-                    </>
-                  ) : 'Generate Script'}
-                </Button>
-
-                {currentProject.generatedScript && (
-                  <div className="bg-muted p-4 rounded-md whitespace-pre-wrap">
-                    {currentProject.generatedScript}
-                  </div>
-                )}
-              </div>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+            </Form>
+          ) : currentProject.generatedScript ? (
+            <div className="bg-muted p-6 rounded-lg min-h-[400px] whitespace-pre-wrap overflow-y-auto text-sm">
+              {currentProject.generatedScript}
+            </div>
+          ) : (
+            <div className="bg-muted p-6 rounded-lg min-h-[400px] flex items-center justify-center text-muted-foreground text-sm">
+              Enter car details and click generate to create a script
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 } 

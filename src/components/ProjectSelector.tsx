@@ -21,6 +21,8 @@ import { z } from "zod";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
+import { Progress } from "@/components/ui/progress";
+import { Plus } from "lucide-react";
 
 // Form validation schema
 const formSchema = z.object({
@@ -82,7 +84,7 @@ export default function ProjectSelector({ projects, onSelectProject }: ProjectSe
   };
   
   return (
-    <div>
+    <div className="max-w-7xl mx-auto">
       <div className="flex justify-between items-center mb-8">
         <h2 className="text-2xl font-bold">Your Projects</h2>
         
@@ -125,7 +127,7 @@ export default function ProjectSelector({ projects, onSelectProject }: ProjectSe
         </Dialog>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {projects.map((project) => (
           <Link
             key={project.id}
@@ -146,12 +148,7 @@ export default function ProjectSelector({ projects, onSelectProject }: ProjectSe
                     <span>Progress:</span>
                     <span>{getProjectProgress(project)}%</span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
-                    <div 
-                      className="bg-primary h-2.5 rounded-full" 
-                      style={{ width: `${getProjectProgress(project)}%` }}
-                    ></div>
-                  </div>
+                  <Progress value={getProjectProgress(project)} />
                 </div>
               </CardContent>
               <CardFooter>
@@ -163,27 +160,14 @@ export default function ProjectSelector({ projects, onSelectProject }: ProjectSe
           </Link>
         ))}
         
-        {/* Add new project card */}
-        <Card 
-          className="h-full border-dashed flex items-center justify-center cursor-pointer hover:bg-accent/50 transition-colors"
+        {/* New Project Card */}
+        <Card
+          className="flex-col gap-6 py-6 h-full border-dashed flex items-center justify-center cursor-pointer hover:bg-accent/50 transition-colors"
           onClick={() => setOpen(true)}
         >
           <CardContent className="flex flex-col items-center justify-center py-10">
             <div className="rounded-full border-2 border-current p-2 mb-3">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M5 12h14" />
-                <path d="M12 5v14" />
-              </svg>
+              <Plus className="h-6 w-6" />
             </div>
             <p className="font-medium">Create New Project</p>
           </CardContent>
